@@ -1408,3 +1408,730 @@
   </script>
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZynexCart - Shop Smart, Live Better</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Brand Colors -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0F2C59',   // Navy Blue
+                        secondary: '#FF6B00', // Orange
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { 
+            getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, 
+            onAuthStateChanged, signOut, signInWithPhoneNumber, RecaptchaVerifier 
+        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDI15D4x7_Lo6w9Eh9M5HPQBXFLq2zFklM",
+            authDomain: "zynexcart-web.firebaseapp.com",
+            projectId: "zynexcart-web",
+            storageBucket: "zynexcart-web.firebasestorage.app",
+            messagingSenderId: "328652532886",
+            appId: "1:328652532886:web:b6552b9f2cdb2f290066b7",
+            measurementId: "G-P9WTMDQEPW"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // --- RECAPTCHA SETUP ---
+        window.setupRecaptcha = () => {
+            if (!window.recaptchaVerifier) {
+                window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+                    'size': 'invisible',
+                    'callback': () => console.log("reCAPTCHA solved")
+                });
+            }
+        };
+
+        // --- UI FUNCTIONS ---
+        window.openModal = () => document.getElementById('authModal').classList.remove('hidden');
+        window.closeModal = () => { 
+            document.getElementById('authModal').classList.add('hidden'); 
+            window.hideError(); 
+        };
+        
+        window.switchTab = (tab) => {
+            const emailForm = document.getElementById('formEmail');
+            const phoneForm = document.getElementById('formPhone');
+            const otpForm = document.getElementById('formOTP');
+            const tabEmail = document.getElementById('tabEmail');
+            const tabPhone = document.getElementById('tabPhone');
+            
+            if(tab === 'email') {
+                emailForm.classList.remove('hidden');
+                phoneForm.classList.add('hidden');
+                otpForm.classList.add('hidden');
+                tabEmail.className = "flex-1 py-3 text-sm font-bold text-primary border-b-2 border-primary bg-blue-50";
+                tabPhone.className = "flex-1 py-3 text-sm font-bold text-gray-500 hover:text-primary";
+            } else {
+                emailForm.classList.add('hidden');
+                phoneForm.classList.remove('hidden');
+                otpForm.classList.add('hidden');
+                tabPhone.className = "flex-1 py-3 text-sm font-bold text-primary border-b-2 border-primary bg-blue-50";
+                tabEmail.className = "flex-1 py-3 text-sm font-bold text-gray-500 hover:text-primary";
+            }
+            window.hideError();
+        };
+
+        window.showOTPForm = () => {
+            document.getElementById('formPhone').classList.add('hidden');
+            document.getElementById('formOTP').classList.remove('hidden');
+        };
+
+        function showError(msg) {
+            const el = document.getElementById('errorMsg');
+            el.innerText = msg; 
+            el.classList.remove('hidden');
+        }
+        window.hideError = () => document.getElementById('errorMsg').classList.add('hidden');
+
+        // --- DATA: CATEGORIES & PRODUCTS ---
+        // Screenshot ke hisaab saari 20 categories yahan hain
+        const categories = [
+            { id: 'paan', name: 'Paan Corner', icon: 'fa-leaf' },
+            { id: 'dairy', name: 'Dairy, Bread & Eggs', icon: 'fa-cheese' },
+            { id: 'fruits', name: 'Fruits & Vegetables', icon: 'fa-carrot' },
+            { id: 'cold-drinks', name: 'Cold Drinks & Juices', icon: 'fa-wine-bottle' },
+            { id: 'snacks', name: 'Snacks & Munchies', icon: 'fa-cookie-bite' },
+            { id: 'breakfast', name: 'Breakfast & Instant Food', icon: 'fa-bowl-food' },
+            { id: 'sweet-tooth', name: 'Sweet Tooth', icon: 'fa-candy-cane' },
+            { id: 'bakery', name: 'Bakery & Biscuits', icon: 'fa-bread-slice' },
+            { id: 'tea-coffee', name: 'Tea, Coffee & Milk Drinks', icon: 'fa-mug-hot' },
+            { id: 'atta-rice', name: 'Atta, Rice & Dal', icon: 'fa-sack-dollar' },
+            { id: 'masala', name: 'Masala, Oil & More', icon: 'fa-pepper-hot' },
+            { id: 'sauces', name: 'Sauces & Spreads', icon: 'fa-jar' },
+            { id: 'meat', name: 'Chicken, Meat & Fish', icon: 'fa-drumstick-bite' },
+            { id: 'organic', name: 'Organic & Healthy Living', icon: 'fa-seedling' },
+            { id: 'baby-care', name: 'Baby Care', icon: 'fa-baby' },
+            { id: 'pharma', name: 'Pharma & Wellness', icon: 'fa-pills' },
+            { id: 'cleaning', name: 'Cleaning Essentials', icon: 'fa-broom' },
+            { id: 'home-office', name: 'Home & Office', icon: 'fa-house-laptop' },
+            { id: 'personal-care', name: 'Personal Care', icon: 'fa-pump-soap' },
+            { id: 'pet-care', name: 'Pet Care', icon: 'fa-paw' }
+        ];
+
+        // Sample Products (Har category ke liye kuch products)
+        const products = [
+            { id: 1, name: "Fresh Bananas (1 Dozen)", price: 60, category: 'fruits', image: "https://images.unsplash.com/photo-1571771896612-e6343820cc79?w=400&q=80" },
+            { id: 2, name: "Lays Classic Salted", price: 20, category: 'snacks', image: "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80" },
+            { id: 3, name: "Amul Taaza Milk", price: 30, category: 'dairy', image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80" },
+            { id: 4, name: "Pepsi Black (750ml)", price: 40, category: 'cold-drinks', image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400&q=80" },
+            { id: 5, name: "Kellogg's Corn Flakes", price: 120, category: 'breakfast', image: "https://images.unsplash.com/photo-1588716286649-d885387034c8?w=400&q=80" },
+            { id: 6, name: "Cadbury Dairy Milk", price: 80, category: 'sweet-tooth', image: "https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=400&q=80" },
+            { id: 7, name: "Britannia Good Day", price: 30, category: 'bakery', image: "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&q=80" },
+            { id: 8, name: "Tata Tea Gold", price: 250, category: 'tea-coffee', image: "https://images.unsplash.com/photo-1597481499750-3e6b22637e12?w=400&q=80" },
+            { id: 9, name: "Fortune Sunflower Oil", price: 140, category: 'masala', image: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&q=80" },
+            { id: 10, name: "Fresh Chicken Breast", price: 220, category: 'meat', image: "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=400&q=80" },
+            { id: 11, name: "Pampers Pants (Large)", price: 600, category: 'baby-care', image: "https://images.unsplash.com/photo-1596483758372-6804da659560?w=400&q=80" },
+            { id: 12, name: "Dettol Handwash", price: 110, category: 'personal-care', image: "https://images.unsplash.com/photo-1585421514738-01798e1e806d?w=400&q=80" },
+            { id: 13, name: "Surf Excel Detergent", price: 180, category: 'cleaning', image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&q=80" },
+            { id: 14, name: "Pedigree Dog Food", price: 450, category: 'pet-care', image: "https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=400&q=80" },
+            { id: 15, name: "Paracetamol 500mg", price: 30, category: 'pharma', image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&q=80" },
+            { id: 16, name: "A4 Paper Ream", price: 350, category: 'home-office', image: "https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=400&q=80" }
+        ];
+
+        let cart = JSON.parse(localStorage.getItem('zynex_cart')) || [];
+        let currentCategory = 'all'; // Default category
+
+        // --- RENDER FUNCTIONS ---
+        function renderCategories() {
+            const container = document.getElementById('categoryList');
+            if (!container) return;
+
+            // "All" button add karna
+            let html = `
+                <button onclick="window.filterCategory('all')" class="flex flex-col items-center gap-2 min-w-[80px] group">
+                    <div class="w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-2xl shadow-md group-hover:bg-secondary transition duration-300 border-2 border-transparent group-hover:border-primary">
+                        <i class="fa-solid fa-border-all"></i>Bilkul! Aapke screenshot mein jo **20 Categories** hain (jaise Paan Corner, Dairy, Fruits, etc.), unka poora working code niche hai.
+
+Maine isse **"Category Filter"** system banaya hai. Ab aapki website par categories ki icons dikhengi, aur jab user kisi category (jaise "Snacks") par click karega, toh sirf usi category ke products dikhenge.
+
+Niche poora updated `index.html` code hai. Ise copy karke paste karein:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZynexCart - Shop Smart, Live Better</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom Brand Colors -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0F2C59',   // Navy Blue
+                        secondary: '#FF6B00', // Orange
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { 
+            getAuth, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, 
+            onAuthStateChanged, signOut, signInWithPhoneNumber, RecaptchaVerifier 
+        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDI15D4x7_Lo6w9Eh9M5HPQBXFLq2zFklM",
+            authDomain: "zynexcart-web.firebaseapp.com",
+            projectId: "zynexcart-web",
+            storageBucket: "zynexcart-web.firebasestorage.app",
+            messagingSenderId: "328652532886",
+            appId: "1:328652532886:web:b6552b9f2cdb2f290066b7",
+            measurementId: "G-P9WTMDQEPW"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // --- RECAPTCHA SETUP ---
+        window.setupRecaptcha = () => {
+            if (!window.recaptchaVerifier) {
+                window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+                    'size': 'invisible',
+                    'callback': () => console.log("reCAPTCHA solved")
+                });
+            }
+        };
+
+        // --- UI FUNCTIONS ---
+        window.openModal = () => document.getElementById('authModal').classList.remove('hidden');
+        window.closeModal = () => { 
+            document.getElementById('authModal').classList.add('hidden'); 
+            window.hideError(); 
+        };
+        
+        window.switchTab = (tab) => {
+            const emailForm = document.getElementById('formEmail');
+            const phoneForm = document.getElementById('formPhone');
+            const otpForm = document.getElementById('formOTP');
+            const tabEmail = document.getElementById('tabEmail');
+            const tabPhone = document.getElementById('tabPhone');
+            
+            if(tab === 'email') {
+                emailForm.classList.remove('hidden');
+                phoneForm.classList.add('hidden');
+                otpForm.classList.add('hidden');
+                tabEmail.className = "flex-1 py-3 text-sm font-bold text-primary border-b-2 border-primary bg-blue-50";
+                tabPhone.className = "flex-1 py-3 text-sm font-bold text-gray-500 hover:text-primary";
+            } else {
+                emailForm.classList.add('hidden');
+                phoneForm.classList.remove('hidden');
+                otpForm.classList.add('hidden');
+                tabPhone.className = "flex-1 py-3 text-sm font-bold text-primary border-b-2 border-primary bg-blue-50";
+                tabEmail.className = "flex-1 py-3 text-sm font-bold text-gray-500 hover:text-primary";
+            }
+            window.hideError();
+        };
+
+        window.showOTPForm = () => {
+            document.getElementById('formPhone').classList.add('hidden');
+            document.getElementById('formOTP').classList.remove('hidden');
+        };
+
+        function showError(msg) {
+            const el = document.getElementById('errorMsg');
+            el.innerText = msg; 
+            el.classList.remove('hidden');
+        }
+        window.hideError = () => document.getElementById('errorMsg').classList.add('hidden');
+
+        // --- DATA: CATEGORIES & PRODUCTS ---
+        // Screenshot ke hisaab saari 20 categories yahan hain
+        const categories = [
+            { id: 'paan', name: 'Paan Corner', icon: 'fa-leaf' },
+            { id: 'dairy', name: 'Dairy, Bread & Eggs', icon: 'fa-cheese' },
+            { id: 'fruits', name: 'Fruits & Vegetables', icon: 'fa-carrot' },
+            { id: 'cold-drinks', name: 'Cold Drinks & Juices', icon: 'fa-wine-bottle' },
+            { id: 'snacks', name: 'Snacks & Munchies', icon: 'fa-cookie-bite' },
+            { id: 'breakfast', name: 'Breakfast & Instant Food', icon: 'fa-bowl-food' },
+            { id: 'sweet-tooth', name: 'Sweet Tooth', icon: 'fa-candy-cane' },
+            { id: 'bakery', name: 'Bakery & Biscuits', icon: 'fa-bread-slice' },
+            { id: 'tea-coffee', name: 'Tea, Coffee & Milk Drinks', icon: 'fa-mug-hot' },
+            { id: 'atta-rice', name: 'Atta, Rice & Dal', icon: 'fa-sack-dollar' },
+            { id: 'masala', name: 'Masala, Oil & More', icon: 'fa-pepper-hot' },
+            { id: 'sauces', name: 'Sauces & Spreads', icon: 'fa-jar' },
+            { id: 'meat', name: 'Chicken, Meat & Fish', icon: 'fa-drumstick-bite' },
+            { id: 'organic', name: 'Organic & Healthy Living', icon: 'fa-seedling' },
+            { id: 'baby-care', name: 'Baby Care', icon: 'fa-baby' },
+            { id: 'pharma', name: 'Pharma & Wellness', icon: 'fa-pills' },
+            { id: 'cleaning', name: 'Cleaning Essentials', icon: 'fa-broom' },
+            { id: 'home-office', name: 'Home & Office', icon: 'fa-house-laptop' },
+            { id: 'personal-care', name: 'Personal Care', icon: 'fa-pump-soap' },
+            { id: 'pet-care', name: 'Pet Care', icon: 'fa-paw' }
+        ];
+
+        // Sample Products (Har category ke liye kuch products)
+        const products = [
+            { id: 1, name: "Fresh Bananas (1 Dozen)", price: 60, category: 'fruits', image: "https://images.unsplash.com/photo-1571771896612-e6343820cc79?w=400&q=80" },
+            { id: 2, name: "Lays Classic Salted", price: 20, category: 'snacks', image: "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80" },
+            { id: 3, name: "Amul Taaza Milk", price: 30, category: 'dairy', image: "https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80" },
+            { id: 4, name: "Pepsi Black (750ml)", price: 40, category: 'cold-drinks', image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=400&q=80" },
+            { id: 5, name: "Kellogg's Corn Flakes", price: 120, category: 'breakfast', image: "https://images.unsplash.com/photo-1588716286649-d885387034c8?w=400&q=80" },
+            { id: 6, name: "Cadbury Dairy Milk", price: 80, category: 'sweet-tooth', image: "https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=400&q=80" },
+            { id: 7, name: "Britannia Good Day", price: 30, category: 'bakery', image: "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=400&q=80" },
+            { id: 8, name: "Tata Tea Gold", price: 250, category: 'tea-coffee', image: "https://images.unsplash.com/photo-1597481499750-3e6b22637e12?w=400&q=80" },
+            { id: 9, name: "Fortune Sunflower Oil", price: 140, category: 'masala', image: "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&q=80" },
+            { id: 10, name: "Fresh Chicken Breast", price: 220, category: 'meat', image: "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?w=400&q=80" },
+            { id: 11, name: "Pampers Pants (Large)", price: 600, category: 'baby-care', image: "https://images.unsplash.com/photo-1596483758372-6804da659560?w=400&q=80" },
+            { id: 12, name: "Dettol Handwash", price: 110, category: 'personal-care', image: "https://images.unsplash.com/photo-1585421514738-01798e1e806d?w=400&q=80" },
+            { id: 13, name: "Surf Excel Detergent", price: 180, category: 'cleaning', image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=400&q=80" },
+            { id: 14, name: "Pedigree Dog Food", price: 450, category: 'pet-care', image: "https://images.unsplash.com/photo-1589924691995-400dc9ecc119?w=400&q=80" },
+            { id: 15, name: "Paracetamol 500mg", price: 30, category: 'pharma', image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&q=80" },
+            { id: 16, name: "A4 Paper Ream", price: 350, category: 'home-office', image: "https://images.unsplash.com/photo-1586075010923-2dd4570fb338?w=400&q=80" }
+        ];
+
+        let cart = JSON.parse(localStorage.getItem('zynex_cart')) || [];
+        let currentCategory = 'all'; // Default category
+
+        // --- RENDER FUNCTIONS ---
+        function renderCategories() {
+            const container = document.getElementById('categoryList');
+            if (!container) return;
+
+            // "All" button add karna
+            let html = `
+                <button onclick="window.filterCategory('all')" class="flex flex-col items-center gap-2 min-w-[80px] group">
+                    <div class="w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-2xl shadow-md group-hover:bg-secondary transition duration-300 border-2 border-transparent group-hover:border-primary">
+                        <i class="fa-solid fa-border-all"></i>
+                    </div>
+                    <span class="text-xs font-bold text-gray-700 text-center group-hover:text-primary">All</span>
+                </button>
+            `;
+
+            // Baaki categories loop karna
+            categories.forEach(cat => {
+                html += `
+                <button onclick="window.filterCategory('${cat.id}')" class="flex flex-col items-center gap-2 min-w-[80px] group">
+                    <div class="w-16 h-16 rounded-full bg-white border border-gray-200 flex items-center justify-center text-2xl text-primary shadow-sm group-hover:bg-primary group-hover:text-white group-hover:border-primary transition duration-300">
+                        <i class="fa-solid ${cat.icon}"></i>
+                    </div>
+                    <span class="text-[11px] font-medium text-gray-600 text-center leading-tight group-hover:text-primary">${cat.name}</span>
+                </button>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderProducts() {
+            const grid = document.getElementById('productGrid');
+            const title = document.getElementById('categoryTitle');
+            if (!grid) return;
+            
+            // Filter products based on currentCategory
+            const filteredProducts = currentCategory === 'all' 
+                ? products 
+                : products.filter(p => p.category === currentCategory);
+
+            // Update Title
+            if(currentCategory === 'all') {
+                title.innerText = "Trending Products";
+            } else {
+                const catName = categories.find(c => c.id === currentCategory)?.name || "Products";
+                title.innerText = catName;
+            }
+
+            if (filteredProducts.length === 0) {
+                grid.innerHTML = `<div class="col-span-full text-center py-10 text-gray-500">No products found in this category.</div>`;
+                return;
+            }
+            
+            grid.innerHTML = filteredProducts.map(p => `
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300 group flex flex-col h-full">
+                    <div class="h-48 overflow-hidden bg-gray-100 relative">
+                        <img src="${p.image}" class="w-full h-full object-cover group-hover:scale-110 transition duration-500" alt="${p.name}">
+                        <span class="absolute top-3 right-3 bg-secondary text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-sm uppercase tracking-wide">Best Seller</span>
+                    </div>
+                    <div class="p-4 flex flex-col flex-grow">
+                        <h3 class="font-bold text-gray-800 mb-2 line-clamp-2 h-12 text-sm">${p.name}</h3>
+                        <p class="text-secondary font-extrabold text-xl mb-4">₹${p.price}</p>
+                        
+                        <div class="mt-auto space-y-2">
+                            <button onclick="window.addToCart(${p.id})" class="w-full bg-primary text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-blue-900 transition flex items-center justify-center gap-2 cursor-pointer shadow-sm">
+                                <i class="fa-solid fa-cart-plus"></i> Add to Cart
+                            </button>
+                            <button onclick="window.buyNow(${p.id})" class="w-full bg-secondary text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-orange-600 transition flex items-center justify-center gap-2 shadow-md shadow-orange-200 cursor-pointer">
+                                <i class="fa-solid fa-bolt"></i> Buy Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- CATEGORY FILTER LOGIC ---
+        window.filterCategory = (catId) => {
+            currentCategory = catId;
+            renderProducts();
+            // Scroll to products section smoothly
+            document.getElementById('page-home').scrollIntoView({ behavior: 'smooth' });
+        };
+
+        // --- CART LOGIC ---
+        window.addToCart = (productId) => {
+            const product = products.find(p => p.id === productId);
+            const existingItem = cart.find(item => item.id === productId);
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                cart.push({ ...product, quantity: 1 });
+            }
+            saveCart();
+            updateCartUI();
+            
+            // Button Feedback
+            const btn = event.target.closest('button');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = `<i class="fa-solid fa-check"></i> Added`;
+            btn.classList.replace('bg-primary', 'bg-green-600');
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.replace('bg-green-600', 'bg-primary');
+            }, 1000);
+        };
+
+        window.buyNow = (productId) => {
+            window.addToCart(productId);
+            setTimeout(() => window.showPage('cart'), 400);
+        };
+
+        window.removeFromCart = (productId) => {
+            cart = cart.filter(item => item.id !== productId);
+            saveCart();
+            renderCartPage();
+        };
+
+        function saveCart() { localStorage.setItem('zynex_cart', JSON.stringify(cart)); }
+
+        function updateCartUI() {
+            const count = cart.reduce((sum, item) => sum + item.quantity, 0);
+            const el = document.getElementById('cartCount');
+            if(el) el.innerText = count;
+        }
+
+        function renderCartPage() {
+            const container = document.getElementById('cartItems');
+            const summary = document.getElementById('cartSummary');
+            
+            if (cart.length === 0) {
+                container.innerHTML = `<div class="p-16 text-center text-gray-500"><i class="fa-solid fa-basket-shopping text-5xl mb-4 text-gray-300"></i><p class="text-lg">Your cart is empty.</p><button onclick="window.showPage('home')" class="mt-6 text-secondary font-bold hover:underline text-lg">Start Shopping</button></div>`;
+                summary.classList.add('hidden');
+                return;
+            }
+
+            let total = 0;
+            container.innerHTML = cart.map(item => {
+                total += item.price * item.quantity;
+                return `
+                <div class="flex items-center gap-5 p-5 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition">
+                    <img src="${item.image}" class="w-20 h-20 object-cover rounded-lg bg-gray-100 shadow-sm">
+                    <div class="flex-1">
+                        <h3 class="font-bold text-gray-800">${item.name}</h3>
+                        <p class="text-secondary font-bold mt-1">₹${item.price} x ${item.quantity}</p>
+                    </div>
+                    <button onclick="window.removeFromCart(${item.id})" class="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>`;
+            }).join('');
+
+            document.getElementById('cartTotal').innerText = total;
+            const finalTotal = document.getElementById('cartTotalFinal');
+            if (finalTotal) finalTotal.innerText = total;
+            summary.classList.remove('hidden');
+        }
+
+        window.showPage = (pageName) => {
+            document.getElementById('page-home').classList.add('hidden');
+            document.getElementById('page-cart').classList.add('hidden');
+            document.getElementById(`page-${pageName}`).classList.remove('hidden');
+            if (pageName === 'cart') renderCartPage();
+            window.scrollTo(0,0);
+        };
+
+        // --- CHECKOUT & AUTH LOGIC ---
+        window.handleCheckout = () => {
+            if (cart.length === 0) return alert("Cart is empty!");
+            const currentUser = auth.currentUser;
+            if (!currentUser) {
+                window.openModal();
+            } else {
+                const total = document.getElementById('cartTotal').innerText;
+                alert(`✅ Order Placed Successfully!\n\nTotal: ₹${total}\nPayment: Credit/Debit Card (Simulated)\nUser: ${currentUser.displayName || currentUser.phoneNumber || currentUser.email.split('@')[0]}`);
+                cart = [];
+                saveCart();
+                updateCartUI();
+                window.showPage('home');
+            }
+        };
+
+        window.handleEmailLogin = async () => {
+            const email = document.getElementById('emailInput').value;
+            const pass = document.getElementById('passInput').value;
+            if(!email || !pass) return showError("Please fill all fields");
+            
+            document.getElementById('loaderEmail').style.display = 'block';
+            window.hideError();
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+                window.closeModal();
+                window.handleCheckout();
+            } catch (error) { showError(error.message); }
+            finally { document.getElementById('loaderEmail').style.display = 'none'; }
+        };
+
+        window.handleGoogleLogin = async () => {
+            try {
+                const provider = new GoogleAuthProvider();
+                await signInWithPopup(auth, provider);
+                window.closeModal();
+                window.handleCheckout();
+            } catch (error) { showError(error.message); }
+        };
+
+        window.sendOTP = async () => {
+            const phone = document.getElementById('phoneInput').value.trim();
+            if(!phone || phone.length < 10) return showError("Enter valid 10-digit number");
+            
+            document.getElementById('loaderPhone').style.display = 'block';
+            window.hideError();
+            try {
+                window.setupRecaptcha();
+                const fullPhone = "+91" + phone;
+                window.confirmationResult = await signInWithPhoneNumber(auth, fullPhone, window.recaptchaVerifier);
+                document.getElementById('loaderPhone').style.display = 'none';
+                window.showOTPForm();
+            } catch (error) {
+                document.getElementById('loaderPhone').style.display = 'none';
+                showError("Error: " + error.message);
+            }
+        };
+
+        window.verifyOTP = async () => {
+            const otp = document.getElementById('otpInput').value.trim();
+            if(!otp || otp.length !== 6) return showError("Enter 6-digit OTP");
+            
+            document.getElementById('loaderOTP').style.display = 'block';
+            window.hideError();
+            try {
+                await window.confirmationResult.confirm(otp);
+                window.closeModal();
+                window.handleCheckout();
+            } catch (error) {
+                document.getElementById('loaderOTP').style.display = 'none';
+                showError("Invalid OTP");
+            }
+        };
+
+        // --- HEADER UPDATE ---
+        window.updateHeader = (user) => {
+            const section = document.getElementById('userSection');
+            if(user) {
+                const name = user.displayName || user.phoneNumber || (user.email ? user.email.split('@')[0] : 'User');
+                const img = user.photoURL || `https://ui-avatars.com/api/?name=${name}&background=0F2C59&color=fff`;
+                section.innerHTML = `
+                    <div class="flex items-center gap-3 cursor-pointer group">
+                        <img src="${img}" class="w-10 h-10 rounded-full border-2 border-primary shadow-sm group-hover:scale-105 transition">
+                        <div class="hidden md:block text-right">
+                            <p class="text-sm font-bold text-primary leading-tight">${name}</p>
+                            <button onclick="window.logout()" class="text-[10px] text-red-500 font-semibold hover:text-red-700">Logout</button>
+                        </div>
+                    </div>`;
+            } else {
+                section.innerHTML = `
+                    <button onclick="window.openModal()" class="flex items-center gap-2 text-primary hover:text-secondary transition font-semibold">
+                        <i class="fa-regular fa-user text-xl"></i>
+                        <span class="hidden sm:block">Login</span>
+                    </button>`;
+            }
+        };
+
+        window.logout = () => signOut(auth).then(() => window.updateHeader(null));
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            renderCategories(); // Categories render karna
+            renderProducts();   // Products render karna
+            updateCartUI();
+            console.log("✅ ZynexCart Loaded with Categories");
+        });
+        
+        onAuthStateChanged(auth, (user) => window.updateHeader(user));
+    </script>
+
+    <style>
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #FF6B00; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Hide scrollbar for category list but allow scrolling */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800">
+
+    <!-- HEADER -->
+    <header class="bg-white shadow-md sticky top-0 z-40 border-b border-gray-100">
+        <div class="max-w-7xl mx-auto px-4 h-20 flex justify-between items-center">
+            <div class="text-3xl font-extrabold text-primary cursor-pointer tracking-tight" onclick="window.showPage('home')">
+                Zynex<span class="text-secondary italic">Cart</span>
+            </div>
+            <div class="flex items-center gap-8">
+                <button onclick="window.showPage('cart')" class="relative text-gray-600 hover:text-primary transition p-2">
+                    <i class="fa-solid fa-cart-shopping text-2xl"></i>
+                    <span id="cartCount" class="absolute -top-1 -right-1 bg-secondary text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">0</span>
+                </button>
+                <div id="userSection"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="max-w-7xl mx-auto p-4 sm:p-8 min-h-screen pb-20">
+        <!-- HOME PAGE -->
+        <div id="page-home" class="fade-in">
+            
+            <!-- CATEGORIES SECTION (New Addition) -->
+            <div class="mb-8">
+                <h2 class="text-xl font-bold text-primary mb-4">Shop by Category</h2>
+                <!-- Horizontal Scrollable List -->
+                <div id="categoryList" class="flex gap-4 overflow-x-auto hide-scrollbar pb-4 snap-x">
+                    <!-- Categories will be injected here by JS -->
+                </div>
+            </div>
+
+            <!-- PRODUCTS SECTION -->
+            <div class="mb-10 flex justify-between items-end border-b pb-2">
+                <h1 id="categoryTitle" class="text-3xl font-extrabold text-primary">Trending Products</h1>
+                <span class="text-sm text-gray-500 font-medium">Showing best deals</span>
+            </div>
+            
+            <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Products will be injected here -->
+            </div>
+        </div>
+
+        <!-- CART PAGE -->
+        <div id="page-cart" class="hidden fade-in max-w-4xl mx-auto">
+            <h1 class="text-3xl font-extrabold text-primary mb-8">Your Shopping Cart</h1>
+            <div id="cartItems" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8"></div>
+            
+            <div id="cartSummary" class="hidden bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+                <div class="space-y-3 mb-8">
+                    <div class="flex justify-between text-gray-600 text-lg"><span>Subtotal</span><span>₹<span id="cartTotal">0</span></span></div>
+                    <div class="flex justify-between text-gray-600 text-lg"><span>Shipping</span><span class="text-green-600 font-bold">FREE</span></div>
+                    <div class="border-t pt-4 flex justify-between text-2xl font-extrabold text-primary"><span>Total Amount</span><span class="text-secondary">₹<span id="cartTotalFinal">0</span></span></div>
+                </div>
+                
+                <button onclick="window.handleCheckout()" class="w-full bg-secondary text-white font-bold py-5 rounded-xl hover:bg-orange-600 transition text-xl shadow-xl shadow-orange-200 flex items-center justify-center gap-3 transform hover:-translate-y-1 duration-200">
+                    <i class="fa-regular fa-credit-card text-2xl"></i> 
+                    Proceed to Pay (Card/UPI)
+                </button>
+                <p class="text-center text-xs text-gray-400 mt-4 flex items-center justify-center gap-2"><i class="fa-solid fa-lock"></i> Secure SSL Encrypted Checkout</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- LOGIN MODAL -->
+    <div id="authModal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="window.closeModal()"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden fade-in border border-gray-100">
+            <div class="bg-primary p-8 text-center relative">
+                <button onclick="window.closeModal()" class="absolute top-4 right-4 text-white/60 hover:text-white transition"><i class="fa-solid fa-xmark text-2xl"></i></button>
+                <h2 class="text-2xl font-bold text-white mb-2">Login Required</h2>
+                <p class="text-blue-200 text-sm">Complete your secure payment</p>
+            </div>
+
+            <div class="flex border-b">
+                <button id="tabEmail" onclick="window.switchTab('email')" class="flex-1 py-4 text-sm font-bold text-primary border-b-2 border-primary bg-blue-50">Email</button>
+                <button id="tabPhone" onclick="window.switchTab('phone')" class="flex-1 py-4 text-sm font-bold text-gray-500 hover:text-primary">Phone Number</button>
+            </div>
+
+            <div class="p-8 space-y-5">
+                <!-- Email Form -->
+                <div id="formEmail" class="space-y-4">
+                    <input type="email" id="emailInput" placeholder="Email Address" class="w-full px-5 py-3.5 rounded-xl border border-gray-200 focus:border-secondary focus:ring-2 focus:ring-orange-100 outline-none transition bg-gray-50">
+                    <input type="password" id="passInput" placeholder="Password" class="w-full px-5 py-3.5 rounded-xl border border-gray-200 focus:border-secondary focus:ring-2 focus:ring-orange-100 outline-none transition bg-gray-50">
+                    <button onclick="window.handleEmailLogin()" class="w-full bg-secondary text-white font-bold py-3.5 rounded-xl hover:bg-orange-600 transition flex justify-center items-center gap-2 shadow-lg shadow-orange-100">
+                        <span>Login & Pay</span>
+                        <div class="loader" id="loaderEmail"></div>
+                    </button>
+                </div>
+
+                <!-- Phone Form -->
+                <div id="formPhone" class="hidden space-y-4">
+                    <div class="flex">
+                        <span class="inline-flex items-center px-4 rounded-l-xl border border-r-0 border-gray-200 bg-gray-100 text-gray-600 text-sm font-bold">+91</span>
+                        <input type="tel" id="phoneInput" placeholder="98765 43210" maxlength="10" class="w-full px-5 py-3.5 rounded-r-xl border border-gray-200 focus:border-secondary outline-none transition bg-gray-50">
+                    </div>
+                    <button onclick="window.sendOTP()" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl hover:bg-blue-900 transition flex justify-center items-center gap-2 shadow-lg shadow-blue-100">
+                        <span>Send OTP</span>
+                        <div class="loader" id="loaderPhone"></div>
+                    </button>
+                </div>
+
+                <!-- OTP Form -->
+                <div id="formOTP" class="hidden space-y-4">
+                    <p class="text-sm text-gray-600 text-center font-medium">Enter 6-digit code sent to your phone</p>
+                    <input type="text" id="otpInput" maxlength="6" placeholder="1 2 3 4 5 6" class="w-full px-5 py-3.5 rounded-xl border border-gray-200 focus:border-secondary outline-none text-center text-2xl font-bold tracking-[0.5em] transition bg-gray-50">
+                    <button onclick="window.verifyOTP()" class="w-full bg-secondary text-white font-bold py-3.5 rounded-xl hover:bg-orange-600 transition flex justify-center items-center gap-2 shadow-lg shadow-orange-100">
+                        <span>Verify & Pay</span>
+                        <div class="loader" id="loaderOTP"></div>
+                    </button>
+                    <button onclick="window.switchTab('phone')" class="w-full text-sm text-gray-500 hover:text-primary font-semibold py-2">Change Phone Number</button>
+                </div>
+
+                <div class="relative flex py-2 items-center">
+                    <div class="flex-grow border-t border-gray-200"></div>
+                    <span class="flex-shrink-0 mx-4 text-gray-400 text-xs font-bold uppercase">Or Continue With</span>
+                    <div class="flex-grow border-t border-gray-200"></div>
+                </div>
+
+                <button onclick="window.handleGoogleLogin()" class="w-full border border-gray-200 text-gray-700 font-bold py-3.5 rounded-xl hover:bg-gray-50 transition flex justify-center items-center gap-3 bg-white">
+                    <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5" alt="Google">
+                    Sign in with Google
+                </button>
+
+                <div id="errorMsg" class="hidden bg-red-50 text-red-600 text-sm p-4 rounded-xl text-center border border-red-100 font-medium"></div>
+            </div>
+            <div id="recaptcha-container" class="absolute bottom-0 right-0"></div>
+        </div>
+    </div>
+
+</body>
+</html>
